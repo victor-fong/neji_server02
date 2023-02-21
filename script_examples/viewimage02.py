@@ -1,0 +1,68 @@
+import cv2
+import numpy as np
+import gzip
+
+from imageai.Detection import ObjectDetection
+import os
+
+def YUVtoRGB(byteArray, w, h):
+    byteArray = np.frombuffer(byteArray, dtype=np.ubyte)
+    e = w*h
+    Y = byteArray[0:e]
+    print(f"Reshaping {len(Y)} bytes into {w} by {h} pixels...")
+    Y = np.reshape(Y, (h,w))
+    Y = Y[:,:1920]
+
+    s = e + int(e/4)
+    V = byteArray[e:s]
+    V = np.repeat(V, 2, 0)
+    V = np.reshape(V, (int(h/2),w))
+    V = np.repeat(V, 2, 0)
+    print(f"Reshaped V to {V.shape}")
+    V = V[:,:1920]
+
+    U = byteArray[s:]
+    U = np.repeat(U, 2, 0)
+    U = np.reshape(U, (int(h/2),w))
+    U = np.repeat(U, 2, 0)
+    U = U[:,:1920]
+    print(f"Reshaped U to {U.shape}")
+
+    RGBMatrix = (np.dstack([Y,U,V])).astype(np.uint8)
+    RGBMatrix = cv2.cvtColor(RGBMatrix, cv2.COLOR_YUV2RGB, 3)
+    return RGBMatrix
+
+def crop(img, w, h):
+    return
+
+def decompress(buf):
+    # work for both gzip and zlib
+    # newbuf = zlib.decompress(buf, 15 + 16)
+    newbuf = gzip.decompress(buf)
+    print(f"BEFORE DECOMPRESS {len(buf)} | AFTER {len(newbuf)}")
+    return newbuf
+
+with open("captured2.yuv", "rb") as file:
+    buf = file.read()
+    buf = decompress(buf)
+
+
+    w,h = 2048,1080
+
+    print(f"Processing {len(buf)} bytes into {w} by {h} pixels...")
+
+    img = YUVtoRGB(buf, w, h)
+
+    print(f"img has shape: {img.shape}")
+
+    execution_path = os.getcwd()
+
+    detector = ObjectDetection()
+    detector.setModelTypeAsRetinaNet()
+    detector.setModelPath( os.path.join(execution_path , "resnet50_coco_best_v2.1.0.h5"))
+    detector.loadModel()
+    returned_image, detections = detector.detectObjectsFromImage(input_type="array", input_image=img, output_type="array", minimum_percentage_probability=30)
+
+    for eachObject in detections:
+        print(eachObject["name"] , " : ", eachObject["percentage_probability"], " : ", eachObject["box_points"] )
+        print("--------------------------------")

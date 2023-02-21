@@ -1,0 +1,5 @@
+*.yuv
+work/
+work_c2/
+__pycache__/
+models/
